@@ -2,7 +2,6 @@
 
 (require 'cl)
 (require 'elx)
-(require 'epkg)
 (require 'vcomp)
 
 (defgroup elm nil
@@ -24,7 +23,55 @@ maintainer of the Emacs Lisp Mirror."
 (defvar elm-missing-features nil
   "List of missing features.")
 
-;;; Utilities.
+;;; Git Utilities.
+
+(defun elm-git-1 (&rest args)
+  "Execute git command in `default-directory'.
+
+Return git's exit status.  It is an error if git's exit status is greater
+than OKSTATUS or if that is not specified 0.  OKSTATUS has to be an
+integer or be omitted.
+
+CMDARGS is applied to CMDFORMAT using `format' to get the command line.
+
+Output goes to the current buffer and is logged to buffer `*elm-git-log*'
+if LOG is t.  LOG has to be t or omitted.
+
+\(fn [OKSTATUS] [LOG] CMDFORMAT CMDARGS)"
+  (let* ((okstatus (if (integerp (car args))
+		       (pop args)
+		     0))
+	 (log (when (eq (car args) t)
+		(pop args)))
+	 (cmdline (concat "git " (apply #'format args)))
+	 (exit (call-process shell-file-name nil t nil
+			     shell-command-switch
+			     cmdline)))
+    (when log
+      (let ((output (buffer-string)))
+	(with-current-buffer (get-buffer-create "*elm-git-log*")
+	  (insert (format "\n$ %s\n" cmdline))
+	  (insert output))))
+    (if (<= exit okstatus)
+	exit
+      (pop-to-buffer (current-buffer))
+      (error "Failed (%s): %s" exit cmdline))))
+
+(defun elm-git (&rest args)
+  "Execute a git command inside the repository REPO.
+
+Return git's output as a list of lines.  If OKSTATUS is specified it is
+consed onto the return value.  Also see `elm-git-1' which is used by this
+function.
+
+\(fn REPO [OKSTATUS] [LOG] CMDFORMAT CMDARGS)"
+  (with-temp-buffer
+    (let* ((default-directory (pop args))
+	   (ret (apply 'elm-git-1 args))
+	   (output (split-string (buffer-string) "\n" t)))
+      (if (integerp (car args))
+	  (cons ret output)
+	output))))
 
 (defmacro elm-hash (name vendor &optional version)
   (if version

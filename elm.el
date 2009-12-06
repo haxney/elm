@@ -1,5 +1,35 @@
 ;;; elm.el --- maintain a mirror of Emacs Lisp packages
 
+;; Copyright (C) 2008, 2009  Jonas Bernoulli
+
+;; Author: Jonas Bernoulli <jonas@bernoul.li>
+;; Created: 20081202
+;; Updated: 20091206
+;; Version: 0.1
+;; Homepage: https://github.com/tarsius/elm
+;; Keywords: libraries
+
+;; This file is not part of GNU Emacs.
+
+;; This file is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation; either version 3, or (at your option)
+;; any later version.
+
+;; This file is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; This library is used to maintain the Emacsmirror which can be found at
+;; http://www.emacsmirror.org.  It could also be used locally to extract
+;; metadata from libraries.
+
 (require 'cl)
 (require 'elx)
 

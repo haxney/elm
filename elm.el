@@ -7,6 +7,24 @@
   "Maintain a mirror of Emacs Lisp packages."
   :group 'package)
 
+(defcustom elm-data-repo
+  (cons (convert-standard-filename "/home/devel/emacs/mirror/meta/sexp/")
+	"master")
+  "The git repository (and optionally branch) containing mirror metadata."
+  :group 'elm
+  :type '(choice (directory :tag "Repository")
+		 (cons (directory :tag "Repository")
+		       (string :tag "Branch"))))
+
+(defcustom elm-wiki-repo
+  (cons (convert-standard-filename "/home/devel/emacs/mirror/wiki/")
+	"wikipages")
+  "The git repository (and optionally branch) containing Emacswiki pages."
+  :group 'elm
+  :type '(choice (directory :tag "Repository")
+		 (cons (directory :tag "Repository")
+		       (string :tag "Branch"))))
+
 ;;; Git Utilities.
 
 (defun elm-git-1 (&rest args)
@@ -78,11 +96,25 @@ are evaluated.  The value returned is the value of the last form in BODY."
 	   (with-syntax-table emacs-lisp-mode-syntax-table
 	     ,@body))))))
 
+(defun elm-prepare-repo (repo)
+  "Prepare the git repository REPO.
+
+If REPO is an atom simply return REPO.  Otherwise it's cdr has to be a
+commit.  In this case checkout that commit and return the car.  REPO, or
+if it is a cons cell it's car, has to be the path to a git repository."
+  (if (atom repo)
+      repo
+    (elm-git (car repo) "checkout %s" (cdr repo))
+    (car repo)))
+
 ;;; Metadata Utilities.
 
-(defun elm-data (package)
-  "Return the data of PACKAGE."
-  (let ((file (concat elm-data-repo package)))
+(defun elm-read-data (name)
+  "Return the metadata of the package named NAME.
+The metadata is read from the file named NAME inside the git repository
+`elm-data-repo' if it exists, otherwise return nil."
+  (let* ((repo (elm-prepare-repo elm-data-repo))
+	 (file (concat repo name)))
     (when (file-regular-p file)
       (with-temp-buffer
 	(insert-file-contents file)
@@ -90,12 +122,15 @@ are evaluated.  The value returned is the value of the last form in BODY."
 	  (when string
 	    (read string)))))))
 
-(defun elm-save-data (package vendor version data &optional merge)
-  "Save DATA for PACKAGE."
-  (let ((file (concat elm-data-repo package)))
+(defun elm-save-data (name data)
+  "Save the metadata DATA for the package named NAME.
+The metadata is stored in a file named NAME inside the git repository
+`elm-data-repo'."
+  (let* ((repo (elm-prepare-repo elm-data-repo))
+	 (file (concat repo name)))
     (with-temp-file file
       (insert (elm-pp-data data)))
-    (elm-git elm-data-repo "add %s" file)))
+    (elm-git repo "add %s" file)))
 
 (defun elm-pp-data (data)
   "Return a string containing the pretty-printed representation of DATA."
@@ -122,34 +157,77 @@ are evaluated.  The value returned is the value of the last form in BODY."
 
 ;;; Extracting.
 
-(defun elm-lisp-files (object)
-  "Return list of all Emacs Lisp files in git object OBJECT."
+(defun elm-extract-data (repo commit name)
+  "Extract the metadata of the package named NAME from COMMIT in REPO.
+
+For `:homepage' and `:wikipage' if that information can not be extracted
+the stored value is used, if any.  Likewise if the \"mainfile\" from which
+most information is extracted can't be determined use the value of option
+\"elm.mainfile\" stored in the git config of the repository, if any.
+If them mainfile can be determined and also isn't stored an error is
+raised."
+  (let ((mainfile (elm-mainfile repo commit name))
+	(old-data (elm-read-data name)))
+    (unless mainfile
+      (error "The mainfile of package %s can not be determined" name))
+    ;; Kludge.  Even though we use `elm-with-file' we have to checkout the
+    ;; correct branch, because we use some functions that use the files
+    ;; from the livefs (`elx-provided' and `elx-required-packages').
+    ;; Instead we should implement alternative functions that work on a
+    ;; git tree instead of the livefs (like I used too).
+    (elm-git repo "checkout %s" commit)
+    (let* ((provided (elx-provided repo))
+	   (required (elx-required-packages repo provided)))
+      (elm-with-file repo commit mainfile
+	(list :summary (elx-summary nil t)
+	      :created (elx-created mainfile)
+	      :updated (elx-updated mainfile)
+	      :license (elx-license)
+	      :authors (elx-authors)
+	      :maintainer (elx-maintainer)
+	      :adapted-by (elx-adapted-by)
+	      :provided provided
+	      :required required
+	      :keywords (elx-keywords mainfile)
+	      :homepage (or (elx-homepage mainfile)
+			    (plist-get old-data :homepage))
+	      :wikipage (or (elx-wikipage
+			     mainfile (elm-prepare-repo elm-wiki-repo) t)
+			    (plist-get old-data :wikipage)))))))
+
+(defun elm-lisp-files (repo commit)
+  "Return a list of all Emacs Lisp files in COMMIT of REPO."
   (mapcan (lambda (file)
 	    (when (string-match "\\.el$" file)
 	      (list file)))
-	  (epkg-git-live "ls-tree -r --name-only %s" object)))
+	  (elm-git repo "ls-tree -r --name-only %s" commit)))
 
-(defun elm-mainfile (name vendor object)
-  "Return the file from git object OBJECT matching NAME.
-If that fails look for a file matching NAME with \"-mode\" added to or
-removed from the end, whatever makes sense.  If that fails also return
-the vendor default if any."
-  (let ((files (elm-lisp-files object)))
-    (if (and (= 1 (length files))
-	     (string-match "\\.el$" (car files)))
+(defun elm-mainfile (repo commit name)
+  "Return the mainfile of the package named NAME stored in COMMIT of REPO.
+
+The returned path is relative to the root of the repository.
+
+If the package has only one file ending in \".el\" return that
+unconditionally.  Otherwise return the file which provides the feature
+matching NAME, or if no such file exists the file that provides the
+feature matching NAME with \"-mode\" added to or removed from the end,
+whatever makes sense.
+
+If no file providing a matching feature can be found return the value of
+option \"elm.mainfile\" stored in the git config of the repository, or if
+that is undefined nil."
+  (let ((files (elm-lisp-files repo commit)))
+    (if (= 1 (length files))
 	(car files)
       (flet ((match (feature)
 		    (car (member* (format "^\\([^/]+/\\)*?%s\\.el$" feature)
 				  files :test 'string-match))))
 	(cond ((match name))
-	      ((match
-		(if (string-match "-mode$" name)
-		    (substring name 0 -5)
-		  (concat name "-mode"))))
-	      (t
-	       (or (plist-get (epkg-data name vendor nil) :mainfile)
-		   (plist-get (epkg-data name nil nil) :mainfile))))))))
-
+	      ((match (if (string-match "-mode$" name)
+			  (substring name 0 -5)
+			(concat name "-mode"))))
+	      (t (let ((file (elm-git repo 1 "config --get elm.mainfile")))
+		   (unless (equal file "") file))))))))
 
 (provide 'elm)
 ;;; elm.el ends here

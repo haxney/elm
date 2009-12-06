@@ -81,6 +81,26 @@ function.
 	   (substring object 7)))
     `(cadr (epkg-git-live 128 "rev-parse remotes/%s/%s/%s"
 			  elm-id ,name ,vendor))))
+(defmacro elm-with-file (repo commit file &rest body)
+  "Execute the forms in BODY with a FILE temporarly current.
+
+REPO is the path to a git repository and COMMIT has to be an existing
+commit in that repository.  FILE is the path to a file relative to the
+repositories root which has to exist in COMMIT.
+
+`buffer-file-name' is set to the basename of FILE while the forms in BODY
+are evaluated.  The value returned is the value of the last form in BODY."
+  (declare (indent 3))
+  (let ((filesym (gensym "file"))
+	(commsym (gensym "comm")))
+    `(let ((default-directory ,repo)
+	   (,filesym ,file)
+	   (,commsym ,commit))
+       (with-temp-buffer
+	 (elm-git-1 "show %s:%s" ,commsym ,filesym)
+	 (let ((buffer-file-name (file-name-nondirectory ,filesym)))
+	   (with-syntax-table emacs-lisp-mode-syntax-table
+	     ,@body))))))
 
 ;;; Extracting.
 

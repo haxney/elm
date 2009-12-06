@@ -102,6 +102,48 @@ are evaluated.  The value returned is the value of the last form in BODY."
 	   (with-syntax-table emacs-lisp-mode-syntax-table
 	     ,@body))))))
 
+;;; Metadata Utilities.
+
+(defun elm-data (package)
+  "Return the data of PACKAGE."
+  (let ((file (concat elm-data-repo package)))
+    (when (file-regular-p file)
+      (with-temp-buffer
+	(insert-file-contents file)
+	(let ((string (buffer-string)))
+	  (when string
+	    (read string)))))))
+
+(defun elm-save-data (package vendor version data &optional merge)
+  "Save DATA for PACKAGE."
+  (let ((file (concat elm-data-repo package)))
+    (with-temp-file file
+      (insert (elm-pp-data data)))
+    (elm-git elm-data-repo "add %s" file)))
+
+(defun elm-pp-data (data)
+  "Return a string containing the pretty-printed representation of DATA."
+  (with-temp-buffer
+    (let ((standard-output (current-buffer)))
+      (princ "(")
+      (while data
+	(let ((key (pop data))
+	      (val (pop data)))
+	  (when val
+	    (unless (looking-back "(")
+	      (princ "\n "))
+	    (princ (format "%-11s " key))
+	    (if (eq key :commentary)
+		(prin1 val)
+	      (let ((lines (split-string (pp-to-string val) "\n" t)))
+		(princ (pop lines))
+		(while (car lines)
+		  (princ "\n")
+		  (indent-to 13)
+		  (princ (pop lines))))))))
+      (princ ")\n"))
+    (buffer-string)))
+
 ;;; Extracting.
 
 (defun elm-lisp-files (object)

@@ -1,4 +1,4 @@
-;;; elm.el --- maintain a mirror of Emacs Lisp packages
+;;; elm.el --- utilities for maintaining the Emacsmirror
 
 ;; Copyright (C) 2008, 2009  Jonas Bernoulli
 
@@ -26,34 +26,178 @@
 
 ;;; Commentary:
 
-;; This library is used to maintain the Emacsmirror which can be found at
+;; This package is used to maintain the Emacsmirror which can be found at
 ;; http://www.emacsmirror.org.  It could also be used locally to extract
 ;; metadata from libraries.
 
+;;; Code:
+
 (require 'cl)
 (require 'elx)
+(require 'assoc)
+(require 'finder)
+(require 'elm-gen)
+(require 'elm-org)
 
 (defgroup elm nil
-  "Maintain a mirror of Emacs Lisp packages."
+  "Utilities for maintaining the Emacsmirror."
   :group 'package)
 
-(defcustom elm-data-repo
-  (cons (convert-standard-filename "/home/devel/emacs/mirror/meta/sexp/")
-	"master")
-  "The git repository (and optionally branch) containing mirror metadata."
-  :group 'elm
-  :type '(choice (directory :tag "Repository")
-		 (cons (directory :tag "Repository")
-		       (string :tag "Branch"))))
+;;; Miscellaneous Data. 
 
-(defcustom elm-wiki-repo
-  (cons (convert-standard-filename "/home/devel/emacs/mirror/wiki/")
-	"wikipages")
-  "The git repository (and optionally branch) containing Emacswiki pages."
+(defcustom elm-known-features nil
+  "Known features.
+An alist mapping feature symbols to package strings.
+
+The value of this variable is overwritten when running function
+`elm-update-features' or `elm-update-packages-list' (which calls the
+former)."
   :group 'elm
-  :type '(choice (directory :tag "Repository")
-		 (cons (directory :tag "Repository")
-		       (string :tag "Branch"))))
+  :type '(repeat (cons (symbol :tag "Feature")
+		       (string :tag "Package"))))
+
+(defcustom elm-known-keywords nil
+  "Known keywords.
+An alist of the form: (KEYWORD PACKAGE...).
+
+The value of this variable is overwritten when running function
+`todo'."
+  :group 'elm
+  :type 'sexp)
+  ;; :type '(repeat (cons (symbol :tag "Keyword")
+  ;; 		       (repeat :tag "Packages"
+  ;; 			       (string :tag "Package")))))
+
+(defcustom elm-non-names nil
+  "Known strings extracted as people names, that are not actually names."
+  :group 'elm
+  :type '(repeat string))
+
+(defcustom elm-non-keywords nil
+  "Known strings extracted as keywords, that are not actually keywords."
+  :group 'elm
+  :type '(repeat string))
+
+(defcustom elm-missing-license nil
+  "List of packages known not to contain any license information."
+  :group 'elm
+  :type '(repeat string))
+
+;; Input Locations.
+
+(defcustom elm-emacs-directory
+  (convert-standard-filename "/usr/share/emacs/23.1.90/lisp/")
+  "The directory containing the Lisp files of Emacs."
+  :group 'elm
+  :type 'directory)
+
+(defcustom elm-packages-directory
+  (convert-standard-filename "/home/devel/emacs/mirror/pkgs/")
+  "The directory containing the repositories of mirrored packages."
+  :group 'elm
+  :type 'directory)
+
+;; Output Locations.
+
+(defcustom elm-page-base
+  (convert-standard-filename "/home/devel/emacs/mirror/page/")
+  "The directory containing page and data repositories and directories."
+  :group 'elm
+  :type 'directory)
+
+(defcustom elm-page-repo
+  (concat elm-page-base (convert-standard-filename "src/"))
+  "The directory containing page source files."
+  :group 'elm
+  :type 'directory)
+
+(defcustom elm-page-dest
+  (concat elm-page-base (convert-standard-filename "dst/"))
+  "The directory containing published page files."
+  :group 'elm
+  :type 'directory)
+
+(defcustom elm-epkg-repo
+  (concat elm-page-repo (convert-standard-filename "meta/epkg/"))
+  "The repository containing epkg sexps."
+  :group 'elm
+  :type '(directory :tag "Repository"))
+
+(defcustom elm-epkg-dest
+  (concat elm-page-dest (convert-standard-filename "epkg/"))
+  "The directory containing published epkg sexps."
+  :group 'elm
+  :type 'directory)
+
+(defcustom elm-epkg-page-repo
+  (concat elm-page-repo (convert-standard-filename "package/"))
+  "The repository containing epkg pages."
+  :group 'elm
+  :type '(directory :tag "Repository"))
+
+(defcustom elm-epkg-page-dest
+  (concat elm-page-dest (convert-standard-filename "package/"))
+  "The directory containing published epkg pages."
+  :group 'elm
+  :type 'directory)
+
+(defcustom elm-package-commentary-repo
+  (concat elm-page-repo (convert-standard-filename
+			 "meta/package-commentaries/"))
+  "The repository containing package commentary files."
+  :group 'elm
+  :type '(directory :tag "Repository"))
+
+(defcustom elm-package-commentary-dest ; not currently used
+  (concat elm-page-dest (convert-standard-filename "commentary/"))
+  "The directory containing published package commentary files."
+  :group 'elm
+  :type 'directory)
+
+(defcustom elm-keyword-page-repo
+  (concat elm-page-repo (convert-standard-filename "keyword/"))
+  "The repository containing keyword pages."
+  :group 'elm
+  :type '(directory :tag "Repository"))
+
+(defcustom elm-keyword-page-dest
+  (concat elm-page-dest (convert-standard-filename "keyword/"))
+  "The directory containing published keyword pages."
+  :group 'elm
+  :type 'directory)
+
+(defcustom elm-keyword-commentary-repo
+  (concat elm-page-repo (convert-standard-filename
+			 "meta/keyword-commentaries/"))
+  "The repository containing keyword commentary files."
+  :group 'elm
+  :type '(directory :tag "Repository"))
+
+(defcustom elm-keyword-commentary-dest ; not currently used
+  (concat elm-page-dest (convert-standard-filename "commentary/"))
+  "The directory containing published keyword commentary files."
+  :group 'elm
+  :type 'directory)
+
+;; Output Links.
+
+(defcustom elm-epkg-link
+  "[[../epkg/%s.epkg][%s]]"
+  "Format string used to create org link to an epkg."
+  :group 'elm
+  :type 'string)
+
+(defcustom elm-repo-link
+  "[[http://github.com/emacsmirror/%s][%s]]"
+  "Format string used to create org link to a repository."
+  :group 'elm
+  :type 'string)
+
+(defcustom elm-repo-url
+  "http://github.com/emacsmirror/%s.git"
+  "Format string used to create git url for a repository."
+  :group 'elm
+  :type 'string)
 
 ;;; Git Utilities.
 
@@ -126,138 +270,116 @@ are evaluated.  The value returned is the value of the last form in BODY."
 	   (with-syntax-table emacs-lisp-mode-syntax-table
 	     ,@body))))))
 
-(defun elm-prepare-repo (repo)
-  "Prepare the git repository REPO.
+;;; Package Utilities.
 
-If REPO is an atom simply return REPO.  Otherwise it's cdr has to be a
-commit.  In this case checkout that commit and return the car.  REPO, or
-if it is a cons cell it's car, has to be the path to a git repository."
-  (if (atom repo)
-      repo
-    (elm-git (car repo) "checkout %s" (cdr repo))
-    (car repo)))
+(defmacro elm-map-packages (function)
+  "Apply FUNCTION to each package stored in `elm-packages-directory'.
+FUNCTION is applied to the name of each package in alphabetic order while
+ignoring case."
+  (declare (indent 0))
+  `(mapc ,function
+	 (mapcan
+	  (lambda (file)
+	    (when (file-directory-p file)
+	      (list (file-name-nondirectory file))))
+	  (sort* (directory-files elm-packages-directory t "^[^.]" t)
+		 (lambda (a b)
+		   (string< (upcase (file-name-nondirectory a))
+			    (upcase (file-name-nondirectory b))))))))
 
-;;; Metadata Utilities.
+(defun elm-package-repo (name)
+  "Return the path of the repository of the package named NAME.
+This is a subdirectory of directory `elm-packages-directory'."
+  (file-name-as-directory (concat elm-packages-directory name)))
 
-(defun elm-read-data (name)
-  "Return the metadata of the package named NAME.
-The metadata is read from the file named NAME inside the git repository
-`elm-data-repo' if it exists, otherwise return nil."
-  (let* ((repo (elm-prepare-repo elm-data-repo))
-	 (file (concat repo name)))
-    (when (file-regular-p file)
+(defun elm-package-mainfile (name &optional full)
+  "Return the mainfile of the package named NAME.
+If optional FULL is non-nil return the absolute path otherwise relative to
+the root of package's repository."
+  (let* ((repo (elm-package-repo name))
+	 (main (cadr (elm-git repo 1 "config --get elm.mainfile"))))
+    (if main
+	(if full
+	    (concat repo main)
+	  main)
+      (elx-package-mainfile repo full))))
+
+(defun elm-package-epkg (name)
+  "Return the file containing the epkg of the package named NAME."
+  (concat elm-epkg-repo name ".epkg"))
+
+(defun elm-package-page (name)
+  "Return the file containing the page of the package named NAME."
+  (concat elm-epkg-page-repo name ".org"))
+
+(defun elm-package-commentary (name)
+  "Return the file containing the commentary of the package named NAME."
+  (concat elm-package-commentary-repo name ".txt"))
+
+(defun elm-feature-commentary (feature)
+  "Return the file containing the commentary of FEATURE."
+  (concat elm-package-commentary-repo (symbol-name feature) ".txt"))
+
+;;; Create and Read Epkgs and Commentary Files.
+
+(defun elm-save-data (name &optional homepage)
+  "Save the metadata (epkg and commentary) of the package named NAME.
+If optional HOMEPAGE is non-nil and the homepage can not be determined
+use HOMEPAGE, otherwise use the extracted value or nil if non can be
+extracted."
+  (let* ((repo (elm-package-repo name))
+	 (main (elm-package-mainfile name t))
+	 (data (elx-package-metadata repo main))
+	 (prev (elm-read-epkg name)))
+    (unless (plist-get data :license)
+      (plist-put data :license (plist-get prev :license)))
+    (unless (plist-get data :homepage)
+      (plist-put data :homepage (or homepage (plist-get prev :homepage))))
+    (unless (plist-get data :wikipage)
+      (plist-put data :wikipage (plist-get prev :wikipage)))
+    (dolist (n (cons (plist-get data :maintainer)
+    		     (plist-get data :authors)))
+      (when (member (car n) elm-non-names)
+    	(setcar n nil)))
+    (elm-save-epkg name (butlast data 2))
+    (elm-save-commentary name (car (last data)))))
+
+(defun elm-save-commentary (name commentary)
+  "Save the commentary COMMENTARY of the package named NAME."
+  (when commentary
+    (with-temp-file (elm-package-commentary name)
+      (insert commentary))))
+
+(defun elm-save-epkg (name data)
+  "Save the metadata DATA of the package named PACKAGE."
+  (with-temp-file (elm-package-epkg name)
+    (insert (elx-pp-metadata data))))
+
+(defun elm-read-epkg (name &optional full)
+  "Return the epkg data of the package named NAME.
+If optional FULL is non-nil include the commentary otherwise don't."
+  (let ((epkg (elm-package-epkg name))
+	(comm (elm-package-commentary name))
+	str data)
+    (when (file-regular-p epkg)
       (with-temp-buffer
-	(insert-file-contents file)
-	(let ((string (buffer-string)))
-	  (when string
-	    (read string)))))))
+	(insert-file-contents epkg)
+	(setq str (buffer-string)))
+      (when str
+	(setq data (read str)))
+      (when (and full
+		 (not (plist-get data :commentary))
+		 (file-regular-p comm))
+	(with-temp-buffer
+	  (insert-file-contents comm)
+	  (setq str (buffer-string)))
+	(when str
+	  (plist-put data :commentary str))))
+    data))
 
-(defun elm-save-data (name data)
-  "Save the metadata DATA for the package named NAME.
-The metadata is stored in a file named NAME inside the git repository
-`elm-data-repo'."
-  (let* ((repo (elm-prepare-repo elm-data-repo))
-	 (file (concat repo name)))
-    (with-temp-file file
-      (insert (elm-pp-data data)))
-    (elm-git repo "add %s" file)))
+;;; tempory
 
-(defun elm-pp-data (data)
-  "Return a string containing the pretty-printed representation of DATA."
-  (with-temp-buffer
-    (let ((standard-output (current-buffer)))
-      (princ "(")
-      (while data
-	(let ((key (pop data))
-	      (val (pop data)))
-	  (when val
-	    (unless (looking-back "(")
-	      (princ "\n "))
-	    (princ (format "%-11s " key))
-	    (if (eq key :commentary)
-		(prin1 val)
-	      (let ((lines (split-string (pp-to-string val) "\n" t)))
-		(princ (pop lines))
-		(while (car lines)
-		  (princ "\n")
-		  (indent-to 13)
-		  (princ (pop lines))))))))
-      (princ ")\n"))
-    (buffer-string)))
-
-;;; Extracting.
-
-(defun elm-extract-data (repo commit name)
-  "Extract the metadata of the package named NAME from COMMIT in REPO.
-
-For `:homepage' and `:wikipage' if that information can not be extracted
-the stored value is used, if any.  Likewise if the \"mainfile\" from which
-most information is extracted can't be determined use the value of option
-\"elm.mainfile\" stored in the git config of the repository, if any.
-If them mainfile can be determined and also isn't stored an error is
-raised."
-  (let ((mainfile (elm-mainfile repo commit name))
-	(old-data (elm-read-data name)))
-    (unless mainfile
-      (error "The mainfile of package %s can not be determined" name))
-    ;; Kludge.  Even though we use `elm-with-file' we have to checkout the
-    ;; correct branch, because we use some functions that use the files
-    ;; from the livefs (`elx-provided' and `elx-required-packages').
-    ;; Instead we should implement alternative functions that work on a
-    ;; git tree instead of the livefs (like I used too).
-    (elm-git repo "checkout %s" commit)
-    (let* ((provided (elx-provided repo))
-	   (required (elx-required-packages repo provided)))
-      (elm-with-file repo commit mainfile
-	(list :summary (elx-summary nil t)
-	      :created (elx-created mainfile)
-	      :updated (elx-updated mainfile)
-	      :license (elx-license)
-	      :authors (elx-authors)
-	      :maintainer (elx-maintainer)
-	      :adapted-by (elx-adapted-by)
-	      :provided provided
-	      :required required
-	      :keywords (elx-keywords mainfile)
-	      :homepage (or (elx-homepage mainfile)
-			    (plist-get old-data :homepage))
-	      :wikipage (or (elx-wikipage
-			     mainfile (elm-prepare-repo elm-wiki-repo) t)
-			    (plist-get old-data :wikipage)))))))
-
-(defun elm-lisp-files (repo commit)
-  "Return a list of all Emacs Lisp files in COMMIT of REPO."
-  (mapcan (lambda (file)
-	    (when (string-match "\\.el$" file)
-	      (list file)))
-	  (elm-git repo "ls-tree -r --name-only %s" commit)))
-
-(defun elm-mainfile (repo commit name)
-  "Return the mainfile of the package named NAME stored in COMMIT of REPO.
-
-The returned path is relative to the root of the repository.
-
-If the package has only one file ending in \".el\" return that
-unconditionally.  Otherwise return the file which provides the feature
-matching NAME, or if no such file exists the file that provides the
-feature matching NAME with \"-mode\" added to or removed from the end,
-whatever makes sense.
-
-If no file providing a matching feature can be found return the value of
-option \"elm.mainfile\" stored in the git config of the repository, or if
-that is undefined nil."
-  (let ((files (elm-lisp-files repo commit)))
-    (if (= 1 (length files))
-	(car files)
-      (flet ((match (feature)
-		    (car (member* (format "^\\([^/]+/\\)*?%s\\.el$" feature)
-				  files :test 'string-match))))
-	(cond ((match name))
-	      ((match (if (string-match "-mode$" name)
-			  (substring name 0 -5)
-			(concat name "-mode"))))
-	      (t (let ((file (elm-git repo 1 "config --get elm.mainfile")))
-		   (unless (equal file "") file))))))))
+(load (concat elm-page-repo (convert-standard-filename "misc/publish.el")))
 
 (provide 'elm)
 ;;; elm.el ends here

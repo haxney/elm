@@ -1,11 +1,11 @@
 ;;; elm.el --- utilities for maintaining the Emacsmirror
 
-;; Copyright (C) 2008, 2009  Jonas Bernoulli
+;; Copyright (C) 2008, 2009, 2010  Jonas Bernoulli
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20081202
-;; Updated: 20091206
-;; Version: 0.1
+;; Updated: 20100216
+;; Version: 0.1+
 ;; Homepage: https://github.com/tarsius/elm
 ;; Keywords: libraries
 
@@ -68,6 +68,10 @@ The value of this variable is overwritten when running function
   ;; 		       (repeat :tag "Packages"
   ;; 			       (string :tag "Package")))))
 
+;; TODO the information stored in this variable is nolonger being used.
+;; The customized value is still being kept so that those fixes do not
+;; get lost and can later be applied to the epkg branch used for manual
+;; fixes.
 (defcustom elm-non-names nil
   "Known strings extracted as people names, that are not actually names."
   :group 'elm
@@ -337,10 +341,6 @@ extracted."
       (plist-put data :homepage (or homepage (plist-get prev :homepage))))
     (unless (plist-get data :wikipage)
       (plist-put data :wikipage (plist-get prev :wikipage)))
-    (dolist (n (cons (plist-get data :maintainer)
-    		     (plist-get data :authors)))
-      (when (member (car n) elm-non-names)
-    	(setcar n nil)))
     (elm-save-epkg name (butlast data 2))
     (elm-save-commentary name (car (last data)))))
 

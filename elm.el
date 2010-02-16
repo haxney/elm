@@ -90,7 +90,7 @@ The value of this variable is overwritten when running function
 ;; Input Locations.
 
 (defcustom elm-emacs-directory
-  (convert-standard-filename "/usr/share/emacs/23.1.90/lisp/")
+  (convert-standard-filename "/usr/share/emacs/lisp/")
   "The directory containing the Lisp files of Emacs."
   :group 'elm
   :type 'directory)
@@ -376,10 +376,6 @@ If optional FULL is non-nil include the commentary otherwise don't."
 	(when str
 	  (plist-put data :commentary str))))
     data))
-
-;;; tempory
-
-(load (concat elm-page-repo (convert-standard-filename "misc/publish.el")))
 
 (provide 'elm)
 ;;; elm.el ends here

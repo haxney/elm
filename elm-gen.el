@@ -1,11 +1,11 @@
 ;;; elm-gen.el --- 
 
-;; Copyright (C) 2008, 2009  Jonas Bernoulli
+;; Copyright (C) 2008, 2009, 2010  Jonas Bernoulli
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
-;; Created: 
-;; Updated: 
-;; Version: 
+;; Created: 20091231
+;; Updated: 20100216
+;; Version: 0.1+
 ;; Homepage: https://github.com/tarsius/elm
 ;; Keywords: libraries
 
@@ -53,25 +53,29 @@
   (elm-update-packages-data)
   (elm-update-packages-index)
   (elm-update-keywords-index)
-  ;; Do this here because it doesn't create html but org files:
+  ;; This does not create the webpages (html) but the files from which
+  ;; (org) these are created.  So it is okay to do this here.
   (elm-update-packages-pages)
   (elm-update-features-pages))
 
 (defun elm-update-features-list ()
   (interactive)
   (setq elx-known-features nil)
+  (elm-map-packages
+    (lambda (name)
+      (message "Updating features of package '%s'..." name)
+      (dolist (feature (elx-provided (elm-package-repo name)))
+	(aput 'elx-known-features feature name)
+	(message "Updating features of package '%s'...done" name))))
+  ;; Adding the features provided by Emacs after the mirrored packages
+  ;; enjures that packages are not pulled in that are actually provided
+  ;; by emacs.  However this also means that the actual package being
+  ;; depended on is not listed in the epkg.
+  ;; TODO find a solution to satisfy both needs.
   (message "Updating features of Emacs...")
   (dolist (feature (elx-provided elm-emacs-directory))
     (aput 'elx-known-features feature "emacs"))
-  (message "Updating features of Emacs...done")
-  (dolist (elt elm-known-features)
-    (aput 'elx-known-features (car elt) (cdr elt)))
-  (elm-map-packages
-    (lambda (name)
-     (message "Updating features of package '%s'..." name)
-     (dolist (feature (elx-provided (elm-package-repo name)))
-       (aput 'elx-known-features feature name)
-     (message "Updating features of package '%s'...done" name)))))
+  (message "Updating features of Emacs...done"))
 
 (defun elm-update-keywords-list ()
   (interactive)

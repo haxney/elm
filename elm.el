@@ -77,6 +77,8 @@ The value of this variable is overwritten when running function
   :group 'elm
   :type '(repeat string))
 
+;; TODO replace this with elm-keyword-remap which will should be able
+;; to eigher drop or replace a keyword.
 (defcustom elm-non-keywords nil
   "Known strings extracted as keywords, that are not actually keywords."
   :group 'elm
@@ -352,6 +354,8 @@ extracted."
 
 (defun elm-save-epkg (name data)
   "Save the metadata DATA of the package named PACKAGE."
+  ;; TODO checkout the branch containing automatically extracted value
+  ;; (as opposed to the branch containing manual fixes and additions).
   (with-temp-file (elm-package-epkg name)
     (insert (elx-pp-metadata data))))
 

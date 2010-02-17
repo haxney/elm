@@ -4,7 +4,7 @@
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20081202
-;; Updated: 20100216
+;; Updated: 20100217
 ;; Version: 0.1+
 ;; Homepage: https://github.com/tarsius/elm
 ;; Keywords: libraries
@@ -27,8 +27,14 @@
 ;;; Commentary:
 
 ;; This package is used to maintain the Emacsmirror which can be found at
-;; http://www.emacsmirror.org.  It could also be used locally to extract
-;; metadata from libraries.
+;; http://www.emacsmirror.org.
+
+;; This library is mostly used to extracts metadata from packages and save
+;; it for future use by e.g. a package manager.
+
+;; Most of the code used to generate the mirrors webpage can be found in
+;; the accompanying libary `elm-org.el' which might eventually be replaced
+;; by a more dynamic webpage.
 
 ;;; Code:
 
@@ -36,12 +42,18 @@
 (require 'elx)
 (require 'assoc)
 (require 'finder)
-(require 'elm-gen)
-(require 'elm-org)
 
 (defgroup elm nil
   "Utilities for maintaining the Emacsmirror."
   :group 'package)
+
+(defcustom elm-base-directory
+  (convert-standard-filename "/home/devel/emacs/mirror/")
+  "The directory where work on the Emacsmirror is done."
+  :group 'elm
+  :type 'directory)
+
+(require 'elm-org)
 
 ;;; Miscellaneous Data. 
 
@@ -77,8 +89,8 @@ The value of this variable is overwritten when running function
   :group 'elm
   :type '(repeat string))
 
-;; TODO replace this with elm-keyword-remap which will should be able
-;; to eigher drop or replace a keyword.
+;; TODO replace this with elm-keyword-remap which should be able to
+;; eigher drop or replace a keyword.
 (defcustom elm-non-keywords nil
   "Known strings extracted as keywords, that are not actually keywords."
   :group 'elm
@@ -89,7 +101,7 @@ The value of this variable is overwritten when running function
   :group 'elm
   :type '(repeat string))
 
-;; Input Locations.
+;;; Input Locations.
 
 (defcustom elm-emacs-directory
   (convert-standard-filename "/usr/share/emacs/lisp/")
@@ -103,49 +115,15 @@ The value of this variable is overwritten when running function
   :group 'elm
   :type 'directory)
 
-;; Output Locations.
+;;; Output Locations.
 
-(defcustom elm-page-base
-  (convert-standard-filename "/home/devel/emacs/mirror/page/")
-  "The directory containing page and data repositories and directories."
-  :group 'elm
-  :type 'directory)
-
-(defcustom elm-page-repo
-  (concat elm-page-base (convert-standard-filename "src/"))
-  "The directory containing page source files."
-  :group 'elm
-  :type 'directory)
-
-(defcustom elm-page-dest
-  (concat elm-page-base (convert-standard-filename "dst/"))
-  "The directory containing published page files."
-  :group 'elm
-  :type 'directory)
+;; TODO move these out of the page repository
 
 (defcustom elm-epkg-repo
   (concat elm-page-repo (convert-standard-filename "meta/epkg/"))
   "The repository containing epkg sexps."
   :group 'elm
   :type '(directory :tag "Repository"))
-
-(defcustom elm-epkg-dest
-  (concat elm-page-dest (convert-standard-filename "epkg/"))
-  "The directory containing published epkg sexps."
-  :group 'elm
-  :type 'directory)
-
-(defcustom elm-epkg-page-repo
-  (concat elm-page-repo (convert-standard-filename "package/"))
-  "The repository containing epkg pages."
-  :group 'elm
-  :type '(directory :tag "Repository"))
-
-(defcustom elm-epkg-page-dest
-  (concat elm-page-dest (convert-standard-filename "package/"))
-  "The directory containing published epkg pages."
-  :group 'elm
-  :type 'directory)
 
 (defcustom elm-package-commentary-repo
   (concat elm-page-repo (convert-standard-filename
@@ -154,56 +132,12 @@ The value of this variable is overwritten when running function
   :group 'elm
   :type '(directory :tag "Repository"))
 
-(defcustom elm-package-commentary-dest ; not currently used
-  (concat elm-page-dest (convert-standard-filename "commentary/"))
-  "The directory containing published package commentary files."
-  :group 'elm
-  :type 'directory)
-
-(defcustom elm-keyword-page-repo
-  (concat elm-page-repo (convert-standard-filename "keyword/"))
-  "The repository containing keyword pages."
-  :group 'elm
-  :type '(directory :tag "Repository"))
-
-(defcustom elm-keyword-page-dest
-  (concat elm-page-dest (convert-standard-filename "keyword/"))
-  "The directory containing published keyword pages."
-  :group 'elm
-  :type 'directory)
-
 (defcustom elm-keyword-commentary-repo
   (concat elm-page-repo (convert-standard-filename
 			 "meta/keyword-commentaries/"))
   "The repository containing keyword commentary files."
   :group 'elm
   :type '(directory :tag "Repository"))
-
-(defcustom elm-keyword-commentary-dest ; not currently used
-  (concat elm-page-dest (convert-standard-filename "commentary/"))
-  "The directory containing published keyword commentary files."
-  :group 'elm
-  :type 'directory)
-
-;; Output Links.
-
-(defcustom elm-epkg-link
-  "[[../epkg/%s.epkg][%s]]"
-  "Format string used to create org link to an epkg."
-  :group 'elm
-  :type 'string)
-
-(defcustom elm-repo-link
-  "[[http://github.com/emacsmirror/%s][%s]]"
-  "Format string used to create org link to a repository."
-  :group 'elm
-  :type 'string)
-
-(defcustom elm-repo-url
-  "http://github.com/emacsmirror/%s.git"
-  "Format string used to create git url for a repository."
-  :group 'elm
-  :type 'string)
 
 ;;; Git Utilities.
 
@@ -326,7 +260,7 @@ the root of package's repository."
   "Return the file containing the commentary of FEATURE."
   (concat elm-package-commentary-repo (symbol-name feature) ".txt"))
 
-;;; Create and Read Epkgs and Commentary Files.
+;;; Creating and Reading Epkgs and Commentary Files.
 
 (defun elm-save-data (name &optional homepage)
   "Save the metadata (epkg and commentary) of the package named NAME.
@@ -380,6 +314,62 @@ If optional FULL is non-nil include the commentary otherwise don't."
 	(when str
 	  (plist-put data :commentary str))))
     data))
+
+;; Updating all Metadata.
+
+(defun elm-update-metadata ()
+  (interactive)
+  (elm-update-features-list)
+  (elm-update-keywords-list)
+  (elm-update-packages-data)
+  (elm-update-packages-index)
+  (elm-update-keywords-index)
+  ;; This does not create the webpages (html) but the files from which
+  ;; (org) these are created.  So it is okay (for now) to do this here.
+  (elm-update-packages-pages)
+  (elm-update-features-pages))
+
+(defun elm-update-features-list ()
+  (interactive)
+  (setq elx-known-features nil)
+  (elm-map-packages
+    (lambda (name)
+      (message "Updating features of package '%s'..." name)
+      (dolist (feature (elx-provided (elm-package-repo name)))
+	(aput 'elx-known-features feature name)
+	(message "Updating features of package '%s'...done" name))))
+  ;; Adding the features provided by Emacs after the mirrored packages
+  ;; enjures that packages are not pulled in that are actually provided
+  ;; by emacs.  However this also means that the actual package being
+  ;; depended on is not listed in the epkg.
+  ;; TODO find a solution to satisfy both needs.
+  (message "Updating features of Emacs...")
+  (dolist (feature (elx-provided elm-emacs-directory))
+    (aput 'elx-known-features feature "emacs"))
+  (message "Updating features of Emacs...done"))
+
+(defun elm-update-keywords-list ()
+  (interactive)
+  (let ((keywords (mapcan (lambda (elt)
+			    (list (list (symbol-name (car elt)))))
+			  finder-known-keywords)))
+    (elm-map-packages
+      (lambda (name)
+	(message "Updating keywords of package '%s'..." name)
+	(dolist (keyword (elx-keywords (elm-package-mainfile name t)))
+	  (unless (member keyword elm-non-keywords)
+	    (aput 'keywords keyword
+		  (sort (cons name (cdr (assoc keyword keywords))) 'string<))))
+	(message "Updating keywords of package '%s'...done" name)))
+    (setq elm-known-keywords (sort* keywords 'string< :key 'car))))
+
+(defun elm-update-packages-data ()
+  (interactive)
+  (elm-map-packages
+    (lambda (name)
+      (message "Updating metadata of package '%s'..." name)
+      (elm-save-data name)
+      (message "Updating metadata of package '%s'...done" name))))
 
 (provide 'elm)
 ;;; elm.el ends here

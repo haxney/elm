@@ -1,11 +1,11 @@
 ;;; elm.el --- utilities for maintaining the Emacsmirror
 
-;; Copyright (C) 2008, 2009  Jonas Bernoulli
+;; Copyright (C) 2008, 2009, 2010  Jonas Bernoulli
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20081202
-;; Updated: 20091206
-;; Version: 0.1
+;; Updated: 20100217
+;; Version: 0.1+
 ;; Homepage: https://github.com/tarsius/elm
 ;; Keywords: libraries
 
@@ -26,7 +26,12 @@
 
 ;;; Commentary:
 
-;;; See `elm.el'.
+;; This library is used to generate the Emacsmiror's webpage at
+;; http://www.emacsmirror.org.  However this statically generated and
+;; usually not up-to-date page might eventually be replaced by a more
+;; dynamic webpage.
+
+;; Also see `elm.el'.
 
 ;;; Code:
 
@@ -35,6 +40,110 @@
 (defgroup elm-org nil
   "Utilities for creating package pages."
   :group 'elm)
+
+(defcustom elm-page-base
+  (concat elm-base-directory (convert-standard-filename "page/"))
+  "The directory containing page and data repositories and directories."
+  :group 'elm-org
+  :type 'directory)
+
+;; Repositories.
+
+(defcustom elm-page-repo
+  (concat elm-page-base (convert-standard-filename "src/"))
+  "The directory containing page source files."
+  :group 'elm-org
+  :type 'directory)
+
+(defcustom elm-epkg-page-repo
+  (concat elm-page-repo (convert-standard-filename "package/"))
+  "The repository containing epkg pages."
+  :group 'elm-org
+  :type '(directory :tag "Repository"))
+
+(defcustom elm-keyword-page-repo
+  (concat elm-page-repo (convert-standard-filename "keyword/"))
+  "The repository containing keyword pages."
+  :group 'elm-org
+  :type '(directory :tag "Repository"))
+
+;;; Destinations of exports.
+
+(defcustom elm-page-dest
+  (concat elm-page-base (convert-standard-filename "dst/"))
+  "The directory containing published page files."
+  :group 'elm-org
+  :type 'directory)
+
+(defcustom elm-epkg-page-dest
+  (concat elm-page-dest (convert-standard-filename "package/"))
+  "The directory containing published epkg pages."
+  :group 'elm-org
+  :type 'directory)
+
+;; TODO stop this nonsense
+(defcustom elm-epkg-dest
+  (concat elm-page-dest (convert-standard-filename "epkg/"))
+  "The directory containing published epkg sexps."
+  :group 'elm-org
+  :type 'directory)
+
+;; TODO don't even start with this nonsense
+(defcustom elm-package-commentary-dest ; not currently used
+  (concat elm-page-dest (convert-standard-filename "commentary/"))
+  "The directory containing published package commentary files."
+  :group 'elm-org
+  :type 'directory)
+
+(defcustom elm-keyword-page-dest
+  (concat elm-page-dest (convert-standard-filename "keyword/"))
+  "The directory containing published keyword pages."
+  :group 'elm-org
+  :type 'directory)
+
+(defcustom elm-keyword-commentary-dest ; not currently used
+  (concat elm-page-dest (convert-standard-filename "commentary/"))
+  "The directory containing published keyword commentary files."
+  :group 'elm
+  :type 'directory)
+
+
+;; Output Links.
+
+(defcustom elm-epkg-link
+  "[[../epkg/%s.epkg][%s]]"
+  "Format string used to create org link to an epkg."
+  :group 'elm-org
+  :type 'string)
+
+(defcustom elm-repo-link
+  "[[http://github.com/emacsmirror/%s][%s]]"
+  "Format string used to create org link to a repository."
+  :group 'elm-org
+  :type 'string)
+
+(defcustom elm-repo-url
+  "http://github.com/emacsmirror/%s.git"
+  "Format string used to create git url for a repository."
+  :group 'elm-org
+  :type 'string)
+
+
+
+
+
+(defcustom elm-mirrored-packages-file
+  "/home/devel/emacs/mirror/page/src/meta/list/mirrored.org"
+  ""
+  :group 'elm-org
+  :type 'file)
+
+(defcustom elm-keywords-file
+  "/home/devel/emacs/mirror/page/src/meta/list/keywords.org"
+  ""
+  :group 'elm-org
+  :type 'file)
+
 
 ;; Utilities.
 
@@ -90,7 +199,44 @@
 	    "unknown"))
   (insert "\n"))
 
-;;; Create Pages.
+;;; Updating Webpages.
+
+(defun elm-org-publish (project)
+  (org-publish-project (assoc project org-publish-project-alist)))
+
+(defun elm-update-all-pages ()
+  (interactive)
+  (elm-org-publish "elm-packages-pages")
+  (elm-org-publish "elm-packages-lists")
+  (elm-org-publish "elm-keywords-pages")
+  (elm-org-publish "elm-keywords-lists")
+  (elm-org-publish "elm-keywords-index")
+  (elm-org-publish "elm-epkgs"))
+
+(defun elm-update-packages-pages ()
+  (interactive)
+  (elm-map-packages 'elm-create-package-page))
+
+(defun elm-update-features-pages ()
+  (interactive)
+  (mapc 'elm-create-keyword-page elm-known-keywords))
+
+;;; Updating Index Pages.
+
+(defun elm-update-packages-index ()
+  (interactive)
+  (with-temp-file elm-mirrored-packages-file
+    (insert (elm--format-list-elements 'elm--insert-package-link
+				       nil "./" :packages))))
+
+(defun elm-update-keywords-index ()
+  (interactive)
+  (with-temp-file elm-keywords-file
+    (insert (elm--format-list-elements 'elm--insert-keyword-link
+				       'car "./"
+				       elm-known-keywords))))
+
+;;; Creating Pages.
 
 (defun elm-create-page (file sections &rest args)
   "Create a page containing SECTIONS using ARGS.
@@ -108,7 +254,25 @@ applied to ARGS in order while output goes to the page too."
 	  (when (and sections (not (looking-back "\n\n")))
 	    (insert "\n")))))))
 
-;; Create Package Pages.
+;;; Creating Statistics Pages.
+
+(defun elm-update-packages-statistics ()
+  (let (licenses)
+    (flet ((inc-license (key)
+	     (let ((ass (assoc key licenses)))
+	       (aput 'licenses key (if ass (1+ (cdr ass)) 1)))))
+      (elm-map-packages
+       (lambda (name)
+	 (let* ((data (elm-read-epkg name)))
+	   (inc-license (or (plist-get data :license)
+			    (if (member name elm-missing-license)
+				"undefined"
+			      "unknown"))))))
+      (sort* licenses '> :key 'cdr)
+      ;; TODO output in useful format, that is a pretty webpage
+      )))
+
+;; Creating Package Pages.
 
 (defcustom elm-package-page-sections
   '((elm--insert-package-header       . nil)

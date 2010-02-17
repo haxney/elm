@@ -84,16 +84,17 @@ The value of this variable is overwritten when running the functions
 		       (string :tag "Package"))))
 
 (defcustom elm-known-keywords nil
-  "Known keywords.
-An alist of the form: (KEYWORD PACKAGE...).
+  "Alist of all known keywords.
 
-The value of this variable is overwritten when running function
-`todo'."
+The car of each element is a keyword string and the cdr is a list of
+packages categorized under that keyword.
+
+The value of this variable is overwritten when running the function
+`elm-update-keywords-list'."
   :group 'elm
-  :type 'sexp)
-  ;; :type '(repeat (cons (symbol :tag "Keyword")
-  ;; 		       (repeat :tag "Packages"
-  ;; 			       (string :tag "Package")))))
+  :type '(repeat (cons (string :tag "Keyword")
+		       (repeat :tag "Packages"
+			       (string :tag "Package")))))
 
 ;; TODO the information stored in this variable is nolonger being used.
 ;; The customized value is still being kept so that those fixes do not
@@ -364,6 +365,7 @@ generate org pages about pages for later export to html."
   (message "Updating features of Emacs...done"))
 
 (defun elm-update-keywords-list ()
+  "Update the value of `elm-known-keywords'."
   (interactive)
   (let ((keywords (mapcan (lambda (elt)
 			    (list (list (symbol-name (car elt)))))

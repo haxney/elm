@@ -57,13 +57,28 @@
 
 ;;; Miscellaneous Data. 
 
-(defcustom elm-known-features nil
-  "Known features.
-An alist mapping feature symbols to package strings.
+(defcustom elm-internal-features nil
+  "Alist of all features provided by mirrored packages.
 
-The value of this variable is overwritten when running function
-`elm-update-features' or `elm-update-packages-list' (which calls the
-former)."
+The car of each element is a feature symbols and the cdr a string
+representing the providing package.  Currently the package is always
+\"emacs\" but in the future this will be the actual package (which is
+distributed with Emacs) that provides the feature.
+
+The value of this variable is overwritten when running the functions
+`elm-update-features' or `elm-update-packages-list'"
+  :group 'elm
+  :type '(repeat (cons (symbol :tag "Feature")
+		       (string :tag "Package"))))
+
+(defcustom elm-external-features nil
+  "Alist of all features provided by mirrored packages.
+
+The car of each element is a feature symbols and the cdr a string
+representing the providing package.
+
+The value of this variable is overwritten when running the functions
+`elm-update-features' or `elm-update-packages-list'."
   :group 'elm
   :type '(repeat (cons (symbol :tag "Feature")
 		       (string :tag "Package"))))
@@ -318,8 +333,11 @@ If optional FULL is non-nil include the commentary otherwise don't."
 ;; Updating all Metadata.
 
 (defun elm-update-metadata ()
+  "Update the metadata of all mirrored packages.
+Also update the value of some runtime variables used for this task and
+generate org pages about pages for later export to html."
   (interactive)
-  (elm-update-features-list)
+  (elm-update-features-lists)
   (elm-update-keywords-list)
   (elm-update-packages-data)
   (elm-update-packages-index)
@@ -329,23 +347,20 @@ If optional FULL is non-nil include the commentary otherwise don't."
   (elm-update-packages-pages)
   (elm-update-features-pages))
 
-(defun elm-update-features-list ()
+(defun elm-update-features-lists ()
+  "Update the value of `elm-internal-features' and `elm-external-features'."
   (interactive)
-  (setq elx-known-features nil)
+  (setq elx-external-features nil)
   (elm-map-packages
     (lambda (name)
       (message "Updating features of package '%s'..." name)
       (dolist (feature (elx-provided (elm-package-repo name)))
-	(aput 'elx-known-features feature name)
+	(aput 'elx-external-features feature name)
 	(message "Updating features of package '%s'...done" name))))
-  ;; Adding the features provided by Emacs after the mirrored packages
-  ;; enjures that packages are not pulled in that are actually provided
-  ;; by emacs.  However this also means that the actual package being
-  ;; depended on is not listed in the epkg.
-  ;; TODO find a solution to satisfy both needs.
+  (setq elx-internal-features nil)
   (message "Updating features of Emacs...")
   (dolist (feature (elx-provided elm-emacs-directory))
-    (aput 'elx-known-features feature "emacs"))
+    (aput 'elx-internal-features feature "emacs"))
   (message "Updating features of Emacs...done"))
 
 (defun elm-update-keywords-list ()
@@ -364,6 +379,7 @@ If optional FULL is non-nil include the commentary otherwise don't."
     (setq elm-known-keywords (sort* keywords 'string< :key 'car))))
 
 (defun elm-update-packages-data ()
+  "Update the metadata of all mirrored packages."
   (interactive)
   (elm-map-packages
     (lambda (name)

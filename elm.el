@@ -5,7 +5,7 @@
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20081202
 ;; Updated: 20100226
-;; Version: 0.1+
+;; Version: 0.2
 ;; Homepage: https://github.com/tarsius/elm
 ;; Keywords: libraries
 
@@ -309,10 +309,13 @@ extracted."
       (plist-put data :homepage (or homepage (plist-get prev :homepage))))
     (unless (plist-get data :wikipage)
       (plist-put data :wikipage (plist-get prev :wikipage)))
-    (dolist (n (cons (plist-get data :maintainer)
-		     (plist-get data :authors)))
-      (when (member (car n) elm-non-names)
-	(setcar n nil)))
+    (when (member (car (plist-get data :maintainer)) elm-non-names)
+      (plist-put data :maintainer nil))
+    (let (authors)
+      (dolist (a (plist-get data :authors))
+	(unless (member (car a) elm-non-names)
+	  (push a authors)))
+      (plist-put data :authors (nreverse authors)))
     (elm-save-epkg name (butlast data 2))
     (elm-save-commentary name (car (last data)))))
 

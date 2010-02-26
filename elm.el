@@ -298,6 +298,7 @@ extracted."
   "Save the commentary COMMENTARY of the package named NAME."
   (when commentary
     (with-temp-file (elm-package-commentary name)
+      (setq buffer-file-coding-system 'no-conversion)
       (insert commentary))))
 
 (defun elm-save-epkg (name data)

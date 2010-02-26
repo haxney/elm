@@ -118,10 +118,6 @@ library might even be loaded from the wrong location.  FIXME!."
 		       (choice (const nil)
 			       (string :tag "Notes")))))
 
-;; TODO the information stored in this variable is nolonger being used.
-;; The customized value is still being kept so that those fixes do not
-;; get lost and can later be applied to the epkg branch used for manual
-;; fixes.
 (defcustom elm-non-names nil
   "Known strings extracted as people names, that are not actually names."
   :group 'elm
@@ -313,6 +309,10 @@ extracted."
       (plist-put data :homepage (or homepage (plist-get prev :homepage))))
     (unless (plist-get data :wikipage)
       (plist-put data :wikipage (plist-get prev :wikipage)))
+    (dolist (n (cons (plist-get data :maintainer)
+		     (plist-get data :authors)))
+      (when (member (car n) elm-non-names)
+	(setcar n nil)))
     (elm-save-epkg name (butlast data 2))
     (elm-save-commentary name (car (last data)))))
 

@@ -96,6 +96,28 @@ The value of this variable is overwritten when running the function
 		       (repeat :tag "Packages"
 			       (string :tag "Package")))))
 
+;;; Known Bad Information.
+
+(defcustom elm-foreign-features nil
+  "Alist of features provided by bundled packages.
+
+Some packages are distributed including external dependencies that they
+depend on.  This causes problems when generating the list of packages
+other packages depend on - the generated epkgs for those packages might
+end up containing the information that they depend on the package whose
+maintainer decided it is a good idea (which it is *not*) to bundle
+external libraries.
+
+By adding an entry here this is prevented.  However in the epkg of the
+package which bundles external libraries these features are still listed
+as provided features.  And worse if the package manager is not aware the
+library might even be loaded from the wrong location.  FIXME!."
+  :group 'elm
+  :type '(repeat (list (symbol :tag "Feature")
+		       (string :tag "Package")
+		       (choice (const nil)
+			       (string :tag "Notes")))))
+
 ;; TODO the information stored in this variable is nolonger being used.
 ;; The customized value is still being kept so that those fixes do not
 ;; get lost and can later be applied to the epkg branch used for manual
@@ -350,18 +372,33 @@ generate org pages about pages for later export to html."
 (defun elm-update-features-lists ()
   "Update the value of `elm-internal-features' and `elm-external-features'."
   (interactive)
-  (setq elx-external-features nil)
+  (setq elm-external-features nil)
   (elm-map-packages
     (lambda (name)
       (message "Updating features of package '%s'..." name)
-      (dolist (feature (elx-provided (elm-package-repo name)))
-	(aput 'elx-external-features feature name)
-	(message "Updating features of package '%s'...done" name))))
-  (setq elx-internal-features nil)
+      (unless (member name elm-skip-packages)
+	(dolist (feature (elx-provided (elm-package-repo name)))
+	  (unless (member* (cons feature name)
+			   elm-foreign-features
+			   :test (lambda (this elt)
+				   (and (eq (car this) (car elt))
+					(equal (cdr this) (cadr elt)))))
+	    (let ((elt (assoc feature elm-external-features)))
+	      (if elt
+		  (error "Feature %s provided by %s and %s"
+			 feature (cdr elt) name)
+		(aput 'elm-external-features feature name))))))
+      (message "Updating features of package '%s'...done" name)))
+  (setq elm-internal-features nil)
   (message "Updating features of Emacs...")
   (dolist (feature (elx-provided elm-emacs-directory))
-    (aput 'elx-internal-features feature "emacs"))
-  (message "Updating features of Emacs...done"))
+    (aput 'elm-internal-features feature "emacs"))
+  (message "Updating features of Emacs...done")
+  ;; TODO should these variables be moved to elx.el instead?
+  ;; TODO first we keep internal and external features apart but
+  ;; then combine them here again.  Decide what we really want.
+  (setq elx-known-features (nconc (copy-list elm-external-features)
+				  (copy-list elm-internal-features))))
 
 (defun elm-update-keywords-list ()
   "Update the value of `elm-known-keywords'."

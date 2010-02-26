@@ -126,31 +126,29 @@ The value of this variable is overwritten when running the function
   :type 'directory)
 
 (defcustom elm-packages-directory
-  (convert-standard-filename "/home/devel/emacs/mirror/pkgs/")
+  (concat elm-base-directory (convert-standard-filename "pkgs/"))
   "The directory containing the repositories of mirrored packages."
   :group 'elm
   :type 'directory)
 
 ;;; Output Locations.
 
-;; TODO move these out of the page repository
-
 (defcustom elm-epkg-repo
-  (concat elm-page-repo (convert-standard-filename "meta/epkg/"))
+  (concat elm-base-directory (convert-standard-filename "meta/epkg/"))
   "The repository containing epkg sexps."
   :group 'elm
   :type '(directory :tag "Repository"))
 
 (defcustom elm-package-commentary-repo
-  (concat elm-page-repo (convert-standard-filename
-			 "meta/package-commentaries/"))
+  (concat elm-base-directory
+	  (convert-standard-filename "meta/package-commentaries/"))
   "The repository containing package commentary files."
   :group 'elm
   :type '(directory :tag "Repository"))
 
 (defcustom elm-keyword-commentary-repo
-  (concat elm-page-repo (convert-standard-filename
-			 "meta/keyword-commentaries/"))
+  (concat elm-base-directory
+	  (convert-standard-filename "meta/keyword-commentaries/"))
   "The repository containing keyword commentary files."
   :group 'elm
   :type '(directory :tag "Repository"))

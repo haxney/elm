@@ -4,7 +4,7 @@
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20081202
-;; Updated: 20100217
+;; Updated: 20100226
 ;; Version: 0.1+
 ;; Homepage: https://github.com/tarsius/elm
 ;; Keywords: libraries
@@ -55,7 +55,7 @@
 
 (require 'elm-org)
 
-;;; Miscellaneous Data. 
+;;; Extracted Information.
 
 (defcustom elm-internal-features nil
   "Alist of all features provided by mirrored packages.
@@ -341,10 +341,10 @@ generate org pages about pages for later export to html."
   (elm-update-features-lists)
   (elm-update-keywords-list)
   (elm-update-packages-data)
+  ;; This does not create the webpages (html) but the files (org) from
+  ;; which these are created.  So it is okay (for now) to do this here.
   (elm-update-packages-index)
   (elm-update-keywords-index)
-  ;; This does not create the webpages (html) but the files from which
-  ;; (org) these are created.  So it is okay (for now) to do this here.
   (elm-update-packages-pages)
   (elm-update-features-pages))
 

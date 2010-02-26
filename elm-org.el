@@ -4,7 +4,7 @@
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20081202
-;; Updated: 20100217
+;; Updated: 20100226
 ;; Version: 0.1+
 ;; Homepage: https://github.com/tarsius/elm
 ;; Keywords: libraries
@@ -43,7 +43,7 @@
 
 (defcustom elm-page-base
   (concat elm-base-directory (convert-standard-filename "page/"))
-  "The directory containing page and data repositories and directories."
+  "The directory containing the webpage's source and generated files."
   :group 'elm-org
   :type 'directory)
 

@@ -322,16 +322,22 @@ extracted."
 (defun elm-save-commentary (name commentary)
   "Save the commentary COMMENTARY of the package named NAME."
   (when commentary
-    (with-temp-file (elm-package-commentary name)
-      (setq buffer-file-coding-system 'no-conversion)
-      (insert commentary))))
+    (let ((comm-name (elm-package-commentary name)))
+      (unless (file-writable-p comm-name)
+        (mkdir (file-name-directory comm-name)))
+     (with-temp-file comm-name
+       (setq buffer-file-coding-system 'no-conversion)
+       (insert commentary)))))
 
 (defun elm-save-epkg (name data)
   "Save the metadata DATA of the package named PACKAGE."
   ;; TODO checkout the branch containing automatically extracted value
   ;; (as opposed to the branch containing manual fixes and additions).
-  (with-temp-file (elm-package-epkg name)
-    (insert (elx-pp-metadata data))))
+  (let ((pkg-name (elm-package-epkg name)))
+    (unless (file-writable-p pkg-name)
+      (mkdir (file-name-directory pkg-name)))
+   (with-temp-file pkg-name
+     (insert (elx-pp-metadata data)))))
 
 (defun elm-read-epkg (name &optional full)
   "Return the epkg data of the package named NAME.

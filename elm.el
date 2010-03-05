@@ -57,6 +57,9 @@
 
 ;;; Extracted Information.
 
+(defvar elm-skip-packages nil
+  "Packages to ignore.")
+
 (defcustom elm-internal-features nil
   "Alist of all features provided by mirrored packages.
 

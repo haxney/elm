@@ -60,6 +60,65 @@
 (defvar elm-skip-packages nil
   "Packages to ignore.")
 
+(defstruct elm-pkg
+  "A structure containing info about a single package.
+
+This contains the complete info about a package as contained in
+the archive index. The fields are:
+
+ - NAME: The name of the package, as a symbol.
+
+ - VERSION: The parsed version of the package.
+
+ - VERSION-RAW: The unsanitized string version of the package version.
+
+ - SUMMARY: The brief description of the package.
+
+ - CREATED: The date this package was created.
+
+ - UPDATED: The date the current version was published.
+
+ - LICENSE: The license of this package (as a symbol).
+
+ - AUTHORS: Alist of author names to email addresses.
+
+ - MAINTAINER: Cons cell of maintainer name and email address.
+
+ - PROVIDES: Features provided by this package.
+
+ - REQUIRES-HARD: The packages hard-required by this package, as
+   a list of ((REQ-NAME . REQ-VERSION) features...) lists, where
+   REQ-NAME is a symbol and REQ-VERSION is a parsed version
+   string.
+
+ - REQUIRES-SOFT: The packages soft-required by this package.
+   Format is the same as REQUIRES-HARD.
+
+ - KEYWORDS: The keywords which describe this package.
+
+ - HOMEPAGE: The upstream homepage of this package.
+
+ - ARCHIVE: The archive from which this package comes, as a symbol.
+
+ - TYPE: The distribution type of the package, currently
+   'single, 'tar, or 'builtin."
+  name
+  version
+  version-raw
+  summary
+  created
+  updated
+  license
+  authors
+  maintainer
+  provides
+  requires-hard
+  requires-soft
+  keywords
+  homepage
+  archive
+  type)
+
 (defcustom elm-internal-features nil
   "Alist of all features provided by mirrored packages.
 

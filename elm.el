@@ -48,7 +48,7 @@
   :group 'package)
 
 (defcustom elm-base-directory
-  (convert-standard-filename "/home/devel/emacs/mirror/")
+  (convert-standard-filename "~/emacs/mirror/")
   "The directory where work on the Emacsmirror is done."
   :group 'elm
   :type 'directory)

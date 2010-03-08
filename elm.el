@@ -303,22 +303,12 @@ If optional HOMEPAGE is non-nil and the homepage can not be determined
 use HOMEPAGE, otherwise use the extracted value or nil if non can be
 extracted."
   (let* ((repo (elm-package-repo name))
-	 (main (elm-package-mainfile name t))
-	 (data (elx-package-metadata repo main))
-	 (prev (elm-read-epkg name)))
-    (unless (plist-get data :license)
-      (plist-put data :license (plist-get prev :license)))
-    (unless (plist-get data :homepage)
-      (plist-put data :homepage (or homepage (plist-get prev :homepage))))
-    (unless (plist-get data :wikipage)
-      (plist-put data :wikipage (plist-get prev :wikipage)))
-    (when (member (car (plist-get data :maintainer)) elm-non-names)
-      (plist-put data :maintainer nil))
-    (let (authors)
-      (dolist (a (plist-get data :authors))
-	(unless (member (car a) elm-non-names)
-	  (push a authors)))
-      (plist-put data :authors (nreverse authors)))
+         (main (elm-package-mainfile name t))
+         (prev (elm-read-epkg name))
+         (data (elx-package-metadata repo main prev)))
+    (setq data (cl-merge-struct 'elx-pkg
+                                (make-elx-pkg :homepage homepage)
+                                data))
     (elm-save-epkg name (butlast data 2))
     (elm-save-commentary name (car (last data)))))
 

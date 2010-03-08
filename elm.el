@@ -326,6 +326,7 @@ extracted."
   "Save the metadata DATA of the package named PACKAGE."
   ;; TODO checkout the branch containing automatically extracted value
   ;; (as opposed to the branch containing manual fixes and additions).
+  (setf (elx-pkg-name data) name)
   (let ((pkg-name (elm-package-epkg name)))
     (unless (file-writable-p pkg-name)
       (mkdir (file-name-directory pkg-name)))

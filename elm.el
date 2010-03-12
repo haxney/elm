@@ -336,23 +336,19 @@ extracted."
 (defun elm-read-epkg (name &optional full)
   "Return the epkg data of the package named NAME.
 If optional FULL is non-nil include the commentary otherwise don't."
-  (let ((epkg (elm-package-epkg name))
-	(comm (elm-package-commentary name))
-	str data)
-    (when (file-regular-p epkg)
+  (let* ((epkg (elm-package-epkg name))
+         (comm (elm-package-commentary name))
+         (data (elx-read-file epkg))
+         str)
+
+    (when (and full
+               (not (elx-pkg-commentary data))
+               (file-regular-p comm))
       (with-temp-buffer
-	(insert-file-contents epkg)
-	(setq str (buffer-string)))
+        (insert-file-contents comm)
+        (setq str (buffer-string)))
       (when str
-	(setq data (read str)))
-      (when (and full
-		 (not (plist-get data :commentary))
-		 (file-regular-p comm))
-	(with-temp-buffer
-	  (insert-file-contents comm)
-	  (setq str (buffer-string)))
-	(when str
-	  (plist-put data :commentary str))))
+        (setf (elx-pkg-commentary data) str)))
     data))
 
 ;; Updating all Metadata.

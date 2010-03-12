@@ -309,7 +309,7 @@ extracted."
     (setq data (cl-merge-struct 'elx-pkg
                                 (make-elx-pkg :homepage homepage)
                                 data))
-    (elm-save-epkg name (butlast data 2))
+    (elm-save-epkg name data)
     (elm-save-commentary name (car (last data)))))
 
 (defun elm-save-commentary (name commentary)

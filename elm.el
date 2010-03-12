@@ -331,7 +331,7 @@ extracted."
     (unless (file-writable-p pkg-name)
       (mkdir (file-name-directory pkg-name)))
    (with-temp-file pkg-name
-     (insert (elx-pp-metadata data)))))
+     (insert (elx-pp-pkg data)))))
 
 (defun elm-read-epkg (name &optional full)
   "Return the epkg data of the package named NAME.

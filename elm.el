@@ -306,9 +306,9 @@ extracted."
          (main (elm-package-mainfile name t))
          (prev (elm-read-epkg name))
          (data (elx-package-metadata repo main prev)))
-    (setq data (cl-merge-struct 'elx-pkg
-                                (make-elx-pkg :homepage homepage)
-                                data))
+    (cl-merge-struct 'elx-pkg
+                     data
+                     (make-elx-pkg :homepage homepage))
     (elm-save-epkg name data)
     (elm-save-commentary name (car (last data)))))
 
